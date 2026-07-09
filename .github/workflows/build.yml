@@ -1,0 +1,48 @@
+name: Build (Alpine musl static)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-musl:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies (Alpine)
+        run: |
+          apk add --no-cache build-base cmake make pkgconfig
+
+      - name: Configure (musl static)
+        run: |
+          rm -rf build
+          # Force static link flags; adjust -static flags if needed
+          cmake -S . -B build \
+            -DSTATIC_BUILD=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -s"
+
+      - name: Build
+        run: cmake --build build -- -j$(nproc)
+
+      - name: Verify artifact
+        run: |
+          if [ -f build/yuze ]; then
+            file build/yuze
+            ldd build/yuze || true
+          else
+            echo "Build output not found at build/yuze"
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yuze-static-musl
+          path: build/yuze
