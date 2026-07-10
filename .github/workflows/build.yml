@@ -9,28 +9,29 @@ on:
 jobs:
   build-musl:
     runs-on: ubuntu-latest
-    container:
-      image: alpine:3.18
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build dependencies (Alpine)
-        run: |
-          apk add --no-cache build-base cmake make pkgconfig
+      # 使用 setup-alpine 在宿主机上配置 Alpine 环境，并预装依赖
+      - name: Setup Alpine Environment
+        uses: jirutka/setup-alpine@v1
+        with:
+          branch: v3.18
+          packages: build-base cmake make pkgconfig
 
-      - name: Configure (musl static)
+      # 在 Alpine 环境内执行 CMake 配置与编译
+      - name: Configure and Build (musl static)
+        shell: alpine.sh {0}  # 指定在 Alpine 环境中运行此步骤
         run: |
           rm -rf build
-          # Force static link flags; adjust -static flags if needed
           cmake -S . -B build \
             -DSTATIC_BUILD=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXE_LINKER_FLAGS="-static -s"
+          cmake --build build -- -j$(nproc)
 
-      - name: Build
-        run: cmake --build build -- -j$(nproc)
-
+      # 验证和上传步骤在 Ubuntu 宿主机上执行即可（宿主机可以正常识别 musl 静态链接文件）
       - name: Verify artifact
         run: |
           if [ -f build/yuze ]; then
